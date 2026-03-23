@@ -1,50 +1,38 @@
-"""
-check_threshold.py
-Reads the MLflow Run ID from model_info.txt, queries the tracking server
-for the logged accuracy metric, and exits with code 1 if it is below the
-required threshold — causing GitHub Actions to halt the pipeline.
-"""
-
-import sys
-import mlflow
+import os, sys, mlflow
 
 THRESHOLD = 0.85
 
-# Read Run ID produced by the validate job 
 try:
     with open("model_info.txt", "r") as f:
         run_id = f.read().strip()
 except FileNotFoundError:
-    print("ERROR: model_info.txt not found. Did the validate job upload it?")
+    print("ERROR: model_info.txt not found.")
+    print(f"Current dir: {os.getcwd()}")
+    print(f"Files: {os.listdir('.')}")
     sys.exit(1)
 
-if not run_id:
-    print("ERROR: model_info.txt is empty.")
+print(f"Run ID: {run_id}")
+print(f"Files in current dir: {os.listdir('.')}")
+
+mlflow.set_tracking_uri("sqlite:///mlflow.db")
+client = mlflow.tracking.MlflowClient()
+
+try:
+    run_data = client.get_run(run_id)
+except Exception as e:
+    print(f"ERROR fetching run: {e}")
     sys.exit(1)
 
-print(f"Checking accuracy for Run ID: {run_id}")
-
-# Fetch the run from MLflow
-mlflow.set_tracking_uri("./mlruns")
-client   = mlflow.tracking.MlflowClient()
-run_data = client.get_run(run_id)
-metrics  = run_data.data.metrics
-
-if "accuracy" not in metrics:
-    print("ERROR: 'accuracy' metric not found in this run.")
+accuracy = run_data.data.metrics.get("accuracy")
+if accuracy is None:
+    print("ERROR: 'accuracy' metric not found.")
     sys.exit(1)
 
-accuracy = metrics["accuracy"]
-print(f"Accuracy logged: {accuracy:.4f}")
-print(f"Threshold      : {THRESHOLD}")
+print(f"Accuracy: {accuracy:.4f} | Threshold: {THRESHOLD}")
 
-# Gate
 if accuracy < THRESHOLD:
-    print(
-        f"FAIL: accuracy {accuracy:.4f} is below threshold {THRESHOLD}. "
-        "Halting deployment."
-    )
-    sys.exit(1)   # Non-zero exit → GitHub Actions marks the step (and job) as failed
+    print(f"FAIL: {accuracy:.4f} < {THRESHOLD}. Halting deployment.")
+    sys.exit(1)
 
-print(f"PASS: accuracy {accuracy:.4f} meets the threshold. Proceeding to deploy.")
+print(f"PASS: {accuracy:.4f} >= {THRESHOLD}. Proceeding to deploy.")
 sys.exit(0)
