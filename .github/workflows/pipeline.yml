@@ -29,11 +29,11 @@ jobs:
           FORCE_FAIL: "0"
         run: python train.py
 
-      - name: Upload mlruns folder as artifact
+      - name: Upload mlflow.db as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mlruns
-          path: mlruns/
+          name: mlflow-db
+          path: mlflow.db
 
       - name: Upload model_info.txt as artifact
         uses: actions/upload-artifact@v4
@@ -56,28 +56,17 @@ jobs:
       - name: Install dependencies
         run: pip install mlflow scikit-learn
 
-      - name: Download mlruns artifact
+      - name: Download mlflow.db artifact
         uses: actions/download-artifact@v4
         with:
-          name: mlruns
-          path: mlruns/
+          name: mlflow-db
+          path: .
 
       - name: Download model_info artifact
         uses: actions/download-artifact@v4
         with:
           name: model-info
           path: .
-
-      - name: Debug - show file structure
-        run: |
-          echo "=== Current directory ==="
-          pwd
-          echo "=== Files in current dir ==="
-          ls -la
-          echo "=== mlruns contents ==="
-          ls -la mlruns/ 2>/dev/null || echo "mlruns NOT FOUND"
-          echo "=== model_info.txt contents ==="
-          cat model_info.txt 2>/dev/null || echo "model_info.txt NOT FOUND"
 
       - name: Check accuracy threshold (>= 0.85)
         run: python check_threshold.py
