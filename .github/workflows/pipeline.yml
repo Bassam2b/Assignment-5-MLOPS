@@ -1,0 +1,77 @@
+name: MLOps Full CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Pull data with DVC
+        run: dvc pull || echo "DVC pull skipped"
+
+      - name: Train model and log to MLflow
+        env:
+          FORCE_FAIL: "0"
+        run: python train.py
+
+      - name: Upload mlruns folder as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlruns
+          path: mlruns/
+
+      - name: Upload model_info.txt as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-info
+          path: model_info.txt
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install mlflow scikit-learn
+
+      - name: Download mlruns artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mlruns
+          path: mlruns/
+
+      - name: Download model_info artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: model-info
+          path: .
+
+      - name: Check accuracy threshold (>= 0.85)
+        run: python check_threshold.py
+
+      - name: Mock Docker build
+        run: |
+          RUN_ID=$(cat model_info.txt)
+          echo "Building Docker image for Run ID: $RUN_ID"
