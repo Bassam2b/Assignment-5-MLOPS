@@ -68,6 +68,17 @@ jobs:
           name: model-info
           path: .
 
+      - name: Debug - show file structure
+        run: |
+          echo "=== Current directory ==="
+          pwd
+          echo "=== Files in current dir ==="
+          ls -la
+          echo "=== mlruns contents ==="
+          ls -la mlruns/ 2>/dev/null || echo "mlruns NOT FOUND"
+          echo "=== model_info.txt contents ==="
+          cat model_info.txt 2>/dev/null || echo "model_info.txt NOT FOUND"
+
       - name: Check accuracy threshold (>= 0.85)
         run: python check_threshold.py
 
